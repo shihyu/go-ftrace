@@ -3,6 +3,7 @@ package eventmanager
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/fatih/color"
@@ -33,6 +34,9 @@ func (m *EventManager) PrintStack(goid uint64) (err error) {
 			}
 			if filename, line, err := m.elf.LineInfoForPc(event.CallerIp); err == nil {
 				lineInfo = fmt.Sprintf("%s:%d", filename, line)
+				if m.trimprefix != "" {
+					lineInfo = strings.TrimPrefix(lineInfo, m.trimprefix)
+				}
 			}
 
 			fmt.Printf("%s %s %s %s(%s) { %s %s\n",
@@ -51,6 +55,9 @@ func (m *EventManager) PrintStack(goid uint64) (err error) {
 			}
 			if filename, line, err := m.elf.LineInfoForPc(event.Ip); err == nil {
 				lineInfo = fmt.Sprintf("%s:%d", filename, line)
+				if m.trimprefix != "" {
+					lineInfo = strings.TrimPrefix(lineInfo, m.trimprefix)
+				}
 			}
 			elapsed := event.TimeNs - startTimeStack[len(startTimeStack)-1]
 			startTimeStack = startTimeStack[:len(startTimeStack)-1]

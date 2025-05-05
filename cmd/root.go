@@ -69,8 +69,16 @@ var rootCmd = &cobra.Command{
 		excludeVendor, _ := cmd.Flags().GetBool("exclude-vendor")
 		uprobeWildcards, _ := cmd.Flags().GetStringSlice("uprobe-wildcards")
 		drilldown, _ := cmd.Flags().GetString("drilldown")
+		trimprefix, _ := cmd.Flags().GetString("trimprefix")
 
-		tracer, err := NewTracer(bin, excludeVendor, uprobeWildcards, fetch, drilldown)
+		cfg := &Config{
+			excludeVendor:   excludeVendor,
+			uprobeWildcards: uprobeWildcards,
+			fetch:           fetch,
+			drilldown:       drilldown,
+			trimprefix:      trimprefix,
+		}
+		tracer, err := NewTracer(bin, cfg)
 		if err != nil {
 			return err
 		}
@@ -108,6 +116,7 @@ func init() {
 	rootCmd.Flags().StringSliceP("uprobe-wildcards", "u", nil, "wildcards for code to add uprobes")
 	rootCmd.Flags().BoolP("exclude-vendor", "x", true, "exclude vendor")
 	rootCmd.Flags().StringP("drilldown", "D", "", "drill down analysis")
+	rootCmd.Flags().StringP("trimprefix", "P", "", "trim filepath prefix")
 
 	rootCmd.MarkFlagRequired("uprobe-wildcards")
 }

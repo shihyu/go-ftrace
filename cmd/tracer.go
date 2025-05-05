@@ -18,14 +18,18 @@ import (
 
 // Tracer ELF bpf tracer
 type Tracer struct {
-	bin             string
-	elf             *elf.ELF
+	bin string
+	elf *elf.ELF
+	cfg *Config
+	bpf *bpf.BPF
+}
+
+type Config struct {
 	excludeVendor   bool
 	uprobeWildcards []string
 	fetch           []string
 	drilldown       string
-
-	bpf *bpf.BPF
+	trimprefix      string
 }
 
 // NewTracer create a new tracer for ELF executable `bin`, it attach uprobes listed in `uprobeWildcards`,
@@ -33,20 +37,20 @@ type Tracer struct {
 //
 // `drilldown` means only show the callstack of the specified function.
 // TODO should we define it as a wildcast pattern, maybe a []string or []patterns?
-func NewTracer(bin string, excludeVendor bool, uprobeWildcards, fetch []string, drilldown string) (_ *Tracer, err error) {
+func NewTracer(bin string, cfg *Config) (_ *Tracer, err error) {
+	if cfg == nil {
+		return nil, errors.New("invalid config: cfg is nil")
+	}
 	elf, err := elf.New(bin)
 	if err != nil {
 		return
 	}
 
 	tracer := &Tracer{
-		bin:             bin,
-		elf:             elf,
-		excludeVendor:   excludeVendor,
-		uprobeWildcards: uprobeWildcards,
-		fetch:           fetch,
-		drilldown:       drilldown,
-		bpf:             bpf.New(),
+		bin: bin,
+		elf: elf,
+		cfg: cfg,
+		bpf: bpf.New(),
 	}
 	return tracer, nil
 }
@@ -60,7 +64,7 @@ func NewTracer(bin string, excludeVendor bool, uprobeWildcards, fetch []string, 
 // Here `EA_expr` is the expression of effective address, based on register and memory addressing mode.
 func (t *Tracer) Parse() (funcs []string, fetchArgs map[string]map[string]string, err error) {
 	fetchArgs = map[string]map[string]string{}
-	for _, s := range t.fetch {
+	for _, s := range t.cfg.fetch {
 		// see: main.(*Student).String
 		if s[len(s)-1] != ')' {
 			funcs = append(funcs, s)
@@ -124,8 +128,8 @@ func (t *Tracer) Start() (err error) {
 	}
 	// parse uprobes
 	uprobes, err := uprobe.Parse(t.elf, &uprobe.ParseOptions{
-		ExcludeVendor:   t.excludeVendor,
-		UprobeWildcards: t.uprobeWildcards,
+		ExcludeVendor:   t.cfg.excludeVendor,
+		UprobeWildcards: t.cfg.uprobeWildcards,
 		FuncNames:       funcs,
 		FetchFuncArgs:   fetchArgs,
 	})
@@ -181,14 +185,16 @@ requireConfirm:
 	defer stop()
 
 	// create eventmanager to poll events, prepare the callstack and print
-	eventManager, err := eventmanager.New(uprobes, t.drilldown, t.elf, t.bpf.PollArg(ctx))
+	mgr, err := eventmanager.New(uprobes, t.elf, t.bpf.PollArg(ctx),
+		t.cfg.drilldown,
+		t.cfg.trimprefix)
 	if err != nil {
 		return
 	}
 	for event := range t.bpf.PollEvents(ctx) {
-		if err = eventManager.Handle(event); err != nil {
+		if err = mgr.Handle(event); err != nil {
 			return
 		}
 	}
-	return eventManager.PrintRemaining()
+	return mgr.PrintRemaining()
 }

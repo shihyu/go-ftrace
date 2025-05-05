@@ -21,10 +21,12 @@ type Event struct {
 
 // EventManager manages events
 type EventManager struct {
-	elf       *elf.ELF
-	argCh     <-chan bpf.GoftraceArgData
-	uprobes   map[string]uprobe.Uprobe
-	drilldown string
+	elf     *elf.ELF
+	argCh   <-chan bpf.GoftraceArgData
+	uprobes map[string]uprobe.Uprobe
+
+	drilldown  string
+	trimprefix string
 
 	goEvents     map[uint64][]Event // k=goid,v=[]event
 	goEventStack map[uint64]uint64
@@ -34,7 +36,7 @@ type EventManager struct {
 }
 
 // New create a new EventManager, which receives events via `ch`
-func New(uprobes []uprobe.Uprobe, drilldown string, elf *elf.ELF, ch <-chan bpf.GoftraceArgData) (_ *EventManager, err error) {
+func New(uprobes []uprobe.Uprobe, elf *elf.ELF, ch <-chan bpf.GoftraceArgData, drilldown, trimprefix string) (_ *EventManager, err error) {
 	host, err := sysinfo.Host()
 	if err != nil {
 		return
@@ -49,6 +51,7 @@ func New(uprobes []uprobe.Uprobe, drilldown string, elf *elf.ELF, ch <-chan bpf.
 		argCh:        ch,
 		uprobes:      uprobesMap,
 		drilldown:    drilldown,
+		trimprefix:   trimprefix,
 		goEvents:     map[uint64][]Event{},
 		goEventStack: map[uint64]uint64{},
 		goArgs:       map[uint64]chan bpf.GoftraceArgData{},
