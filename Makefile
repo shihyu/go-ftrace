@@ -8,14 +8,19 @@
 all:
 	cd cmd/ftrace && go build -v
 
+GOBIN := $(shell go env GOBIN)
+ifeq ($(GOBIN),)
+GOBIN := $(shell go env GOPATH)/bin
+endif
+
 install:
 	cd cmd/ftrace && go install -v
-	sudo ln -sf ~/go/bin/ftrace /usr/sbin
-	sudo chown root:root ~/go/bin/ftrace
-	sudo chmod u+s /usr/sbin/ftrace
+	sudo ln -sf $(GOBIN)/ftrace /usr/sbin/ftrace
+	sudo chown root:root $(GOBIN)/ftrace
+	sudo chmod u+s $(GOBIN)/ftrace
 
 clean:
-	rm -f ~/go/bin/ftrace
+	rm -f $(GOBIN)/ftrace
 	sudo rm -rf /usr/sbin/ftrace
 
 .PHONY: clean

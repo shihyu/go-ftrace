@@ -32,7 +32,7 @@ struct config
 // to guarantee the visibility of the data btw tasks.
 //
 // CONFIG is overwritten by `spec.RewriteConstants(map[string]interface{}{"CONFIG": cfg})`
-static volatile const struct config CONFIG = {};
+volatile const struct config CONFIG = {};
 
 // bpf write event data when enter/exit a function
 struct event
@@ -45,9 +45,6 @@ struct event
 	__u64 time_ns;
 	__u8 location;
 };
-
-// force emitting struct event into the ELF.
-const struct event *_ __attribute__((unused));
 
 // fetch 1 arg needs several rules (at most 8 rules), each rule is a struct arg_rule
 struct arg_rule
@@ -67,64 +64,58 @@ struct arg_rules
 	struct arg_rule rules[8];
 };
 
-const struct arg_rules *__ __attribute__((unused));
-
 struct arg_data
 {
 	__u64 goid;
 	__u8 data[MAX_DATA_SIZE];
 };
 
-const struct arg_data *___ __attribute__((unused));
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, __u64);
+	__type(value, struct arg_rules);
+	__uint(max_entries, 100);
+} arg_rules_map SEC(".maps");
 
-struct bpf_map_def SEC("maps") arg_rules_map = {
-	.type = BPF_MAP_TYPE_HASH,
-	.key_size = sizeof(__u64),
-	.value_size = sizeof(struct arg_rules),
-	.max_entries = 100,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_QUEUE);
+	__uint(value_size, sizeof(struct arg_data));
+	__uint(max_entries, 10000);
+} arg_queue SEC(".maps");
 
-struct bpf_map_def SEC("maps") arg_queue = {
-	.type = BPF_MAP_TYPE_QUEUE,
-	.key_size = 0,
-	.value_size = sizeof(struct arg_data),
-	.max_entries = 10000,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+	__type(key, __u32);
+	__type(value, struct arg_data);
+	__uint(max_entries, 1);
+} arg_stack SEC(".maps");
 
-struct bpf_map_def SEC("maps") arg_stack = {
-	.type = BPF_MAP_TYPE_PERCPU_ARRAY,
-	.key_size = sizeof(__u32),
-	.value_size = sizeof(struct arg_data),
-	.max_entries = 1,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_QUEUE);
+	__uint(value_size, sizeof(struct event));
+	__uint(max_entries, 10000);
+} event_queue SEC(".maps");
 
-struct bpf_map_def SEC("maps") event_queue = {
-	.type = BPF_MAP_TYPE_QUEUE,
-	.key_size = 0,
-	.value_size = sizeof(struct event),
-	.max_entries = 10000,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+	__type(key, __u32);
+	__type(value, struct event);
+	__uint(max_entries, 1);
+} event_stack SEC(".maps");
 
-struct bpf_map_def SEC("maps") event_stack = {
-	.type = BPF_MAP_TYPE_PERCPU_ARRAY,
-	.key_size = sizeof(__u32),
-	.value_size = sizeof(struct event),
-	.max_entries = 1,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, __u64);
+	__type(value, __u8);
+	__uint(max_entries, 10000);
+} should_trace_goid SEC(".maps");
 
-struct bpf_map_def SEC("maps") should_trace_goid = {
-	.type = BPF_MAP_TYPE_HASH,
-	.key_size = sizeof(__u64),
-	.value_size = sizeof(bool),
-	.max_entries = 10000,
-};
-
-struct bpf_map_def SEC("maps") should_trace_rip = {
-	.type = BPF_MAP_TYPE_HASH,
-	.key_size = sizeof(__u64),
-	.value_size = sizeof(bool),
-	.max_entries = 10000,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, __u64);
+	__type(value, __u8);
+	__uint(max_entries, 10000);
+} should_trace_rip SEC(".maps");
 
 static __always_inline
 	__u64

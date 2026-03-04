@@ -11,12 +11,24 @@ import (
 	"github.com/hitzhangjie/go-ftrace/internal/uprobe"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
+	"structs"
 )
 
 const (
 	EventDataOffset int64 = 436
 	VacantR10Offset       = -96
 )
+
+// GoftraceArgRule is an alias for the anonymous rule struct inside GoftraceArgRules.
+type GoftraceArgRule = struct {
+	_           structs.HostLayout
+	Type        uint8
+	Reg         uint8
+	Size        uint8
+	Length      uint8
+	Offsets     [8]int16
+	Dereference [8]uint8
+}
 
 var RegisterConstants = map[string]uint8{
 	"ax":  0,
@@ -90,7 +102,7 @@ func (b *BPF) Load(uprobes []uprobe.Uprobe, opts LoadOptions) (err error) {
 		return
 	}
 	if err = spec.LoadAndAssign(b.objs, &ebpf.CollectionOptions{
-		Programs: ebpf.ProgramOptions{LogSize: ebpf.DefaultVerifierLogSize * 4},
+		Programs: ebpf.ProgramOptions{LogSizeStart: 64 * 1024 * 4},
 	}); err != nil {
 		return
 	}
@@ -162,7 +174,7 @@ func (b *BPF) Attach(bin string, uprobes []uprobe.Uprobe) (err error) {
 			prog = b.objs.GoroutineExit
 		}
 		fmt.Printf("attaching %d/%d\r", i+1, len(uprobes))
-		up, err := ex.Uprobe("", prog, &link.UprobeOptions{Offset: up.AbsOffset})
+		up, err := ex.Uprobe("", prog, &link.UprobeOptions{Address: up.AbsOffset})
 		if err != nil {
 			return err
 		}
